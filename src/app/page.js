@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { pdf } from "@react-pdf/renderer";
 import InvoicePDF from "@/components/InvoicePDF";
 
@@ -10,9 +11,49 @@ export default function Home() {
     tanggal_jatuh_tempo: "",
     items: [{ id: 1, date: "", quantity: "" }],
     satuan: "",
+    rekening: {
+      nomor_rekening: "",
+      bank: "",
+      nama_rekening: ""
+    },
+    penanda_tangan: "",
   });
 
   const [invoiceOrder, setInvoiceOrder] = useState("");
+  const [isClient, setIsClient] = useState(false);
+
+  // Check if it's client-side to avoid SSR issues
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Load data from localStorage only on the client
+  useEffect(() => {
+    if (isClient) {
+      const savedData = localStorage.getItem("invoice_data");
+      const savedOrder = localStorage.getItem("invoice_order");
+      if (savedData) {
+        setData(JSON.parse(savedData));
+      }
+      if (savedOrder) {
+        setInvoiceOrder(savedOrder);
+      }
+    }
+  }, [isClient]);
+
+  // Simpan ke localStorage setiap kali `data` berubah
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("invoice_data", JSON.stringify(data));
+    }
+  }, [data, isClient]);
+
+  // Simpan ke localStorage setiap kali `invoiceOrder` berubah
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("invoice_order", invoiceOrder);
+    }
+  }, [invoiceOrder, isClient]);
 
   const formatInvoiceNumber = (order, tanggal) => {
     if (!tanggal || !order) return "";
@@ -25,10 +66,7 @@ export default function Home() {
   const handleAddItem = () => {
     setData((prev) => ({
       ...prev,
-      items: [
-        ...prev.items,
-        { id: prev.items.length + 1, date: "", quantity: "" },
-      ],
+      items: [...prev.items, { id: prev.items.length + 1, date: "", quantity: "" }],
     }));
   };
 
@@ -53,15 +91,8 @@ export default function Home() {
   };
 
   const handleSubmit = () => {
-    if (
-      !invoiceOrder ||
-      !data.tanggal ||
-      !data.tanggal_jatuh_tempo ||
-      !data.satuan
-    ) {
-      alert(
-        "Harap isi semua field utama (Nota ke-, Tanggal, Harga Satuan, dan Tanggal Jatuh Tempo)."
-      );
+    if (!invoiceOrder || !data.tanggal || !data.tanggal_jatuh_tempo || !data.satuan) {
+      alert("Harap isi semua field utama (Nota ke-, Tanggal, Harga Satuan, dan Tanggal Jatuh Tempo).");
       return;
     }
 
@@ -72,10 +103,18 @@ export default function Home() {
       }
     }
 
+    if (!data.rekening.nomor_rekening || !data.rekening.bank || !data.rekening.nama_rekening) {
+      alert("Harap lengkapi semua data rekening (Nomor Rekening, Nama Bank, Nama Rekening).");
+      return;
+    }
+
+    if (!data.penanda_tangan) {
+      alert("Harap isi nama penanda tangan.");
+      return;
+    }
+
     if (!data.nomor_nota) {
-      alert(
-        "Nomor nota belum terbentuk. Periksa input 'Nota ke-' dan 'Tanggal'."
-      );
+      alert("Nomor nota belum terbentuk. Periksa input 'Nota ke-' dan 'Tanggal'.");
       return;
     }
 
@@ -95,6 +134,10 @@ export default function Home() {
       a.download = `Invoice_${data.nomor_nota}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+
+      // Hapus localStorage setelah submit berhasil
+      localStorage.removeItem("invoice_data");
+      localStorage.removeItem("invoice_order");
     });
   };
 
@@ -104,15 +147,21 @@ export default function Home() {
   );
   const totalHarga = totalJumlah * Number(data.satuan);
 
+  if (!isClient) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="h-screen flex flex-col">
-      <header className=" p-4 shadow-md">
+      <header className="p-4 shadow-md">
         <div className="container mx-auto flex items-center justify-between">
           <h1 className="text-lg font-bold">Invoice Generator</h1>
         </div>
       </header>
+
       <div className="flex-1 overflow-y-auto p-4">
         <form className="flex flex-col gap-6">
+          {/* Input Form */}
           <div className="flex gap-2 mb-4">
             <label className="w-1/3">Nota ke-</label>
             <input
@@ -123,10 +172,7 @@ export default function Home() {
                 const val = e.target.value;
                 setInvoiceOrder(val);
                 if (data.tanggal) {
-                  handleChange(
-                    "nomor_nota",
-                    formatInvoiceNumber(val, data.tanggal)
-                  );
+                  handleChange("nomor_nota", formatInvoiceNumber(val, data.tanggal));
                 }
               }}
             />
@@ -142,10 +188,7 @@ export default function Home() {
                 const tgl = e.target.value;
                 handleChange("tanggal", tgl);
                 if (invoiceOrder) {
-                  handleChange(
-                    "nomor_nota",
-                    formatInvoiceNumber(invoiceOrder, tgl)
-                  );
+                  handleChange("nomor_nota", formatInvoiceNumber(invoiceOrder, tgl));
                 }
               }}
             />
@@ -157,9 +200,7 @@ export default function Home() {
               type="date"
               className="input border rounded border-gray-300 flex-1"
               value={data.tanggal_jatuh_tempo}
-              onChange={(e) =>
-                handleChange("tanggal_jatuh_tempo", e.target.value)
-              }
+              onChange={(e) => handleChange("tanggal_jatuh_tempo", e.target.value)}
             />
           </div>
 
@@ -173,21 +214,70 @@ export default function Home() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm mb-1">Nomor nota</label>
+          <div className="flex gap-2 mb-4">
+            <label className="w-1/3">Nama Penanda Tangan</label>
             <input
               type="text"
-              className="input border rounded border-gray-300 w-full"
-              value={data.nomor_nota}
-              readOnly
+              className="input border rounded border-gray-300 flex-1"
+              value={data.penanda_tangan}
+              onChange={(e) => handleChange("penanda_tangan", e.target.value)}
+              placeholder="Contoh: JOHN DOE"
             />
           </div>
 
+          {/* Rekening Info */}
+          <div className="flex flex-col gap-2 mb-4">
+            <label className="font-bold">Informasi Rekening</label>
+
+            <div className="flex gap-2">
+              <label className="w-1/3">Nomor Rekening</label>
+              <input
+                type="tel"
+                className="input border rounded border-gray-300 flex-1"
+                value={data.rekening.nomor_rekening}
+                onChange={(e) =>
+                  setData((prev) => ({
+                    ...prev,
+                    rekening: { ...prev.rekening, nomor_rekening: e.target.value },
+                  }))
+                }
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <label className="w-1/3">Nama Bank</label>
+              <input
+                type="text"
+                className="input border rounded border-gray-300 flex-1"
+                value={data.rekening.bank}
+                onChange={(e) =>
+                  setData((prev) => ({
+                    ...prev,
+                    rekening: { ...prev.rekening, bank: e.target.value },
+                  }))
+                }
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <label className="w-1/3">Nama Rekening</label>
+              <input
+                type="text"
+                className="input border rounded border-gray-300 flex-1"
+                value={data.rekening.nama_rekening}
+                onChange={(e) =>
+                  setData((prev) => ({
+                    ...prev,
+                    rekening: { ...prev.rekening, nama_rekening: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          {/* Item List */}
           {data.items.map((item, index) => (
-            <div
-              key={item.id}
-              className="border p-4 rounded relative mb-4 bg-gray-50"
-            >
+            <div key={item.id} className="border p-4 rounded relative mb-4 bg-gray-50">
               <button
                 type="button"
                 onClick={() => handleRemoveItem(index)}
@@ -196,9 +286,8 @@ export default function Home() {
               >
                 &times;
               </button>
-              <label className="block font-medium mb-1">
-                Item ke-{index + 1}
-              </label>
+              <label className="block font-medium mb-1">Item ke-{index + 1}</label>
+
               <div className="flex flex-col gap-2">
                 <div>
                   <label className="block text-sm mb-1">Tanggal</label>
@@ -206,21 +295,18 @@ export default function Home() {
                     type="date"
                     className="input border rounded border-gray-300 w-full"
                     value={item.date}
-                    onChange={(e) =>
-                      handleItemChange(index, "date", e.target.value)
-                    }
+                    onChange={(e) => handleItemChange(index, "date", e.target.value)}
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm mb-1">Jumlah</label>
                   <input
                     type="tel"
-                    placeholder="Masukkan jumlah"
                     className="input border rounded border-gray-300 w-full"
                     value={item.quantity}
-                    onChange={(e) =>
-                      handleItemChange(index, "quantity", e.target.value)
-                    }
+                    onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                    placeholder="Masukkan jumlah"
                   />
                 </div>
               </div>
@@ -232,7 +318,7 @@ export default function Home() {
             onClick={handleAddItem}
             className="btn btn-neutral rounded mt-2 w-full bg-blue-600 text-white"
           >
-            Tambah
+            Tambah Item
           </button>
         </form>
       </div>
@@ -249,20 +335,9 @@ export default function Home() {
   );
 }
 
-// Fungsi bantu: Ubah angka ke teks dalam bahasa Indonesia
+// Fungsi bantu: Ubah angka ke teks bahasa Indonesia
 function terbilang(n) {
-  const angka = [
-    "",
-    "Satu",
-    "Dua",
-    "Tiga",
-    "Empat",
-    "Lima",
-    "Enam",
-    "Tujuh",
-    "Delapan",
-    "Sembilan",
-  ];
+  const angka = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan"];
   const satuan = ["", " Ribu", " Juta", " Miliar"];
 
   if (n === 0) return "Nol";

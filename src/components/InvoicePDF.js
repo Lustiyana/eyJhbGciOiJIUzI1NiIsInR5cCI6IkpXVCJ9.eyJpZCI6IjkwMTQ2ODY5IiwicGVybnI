@@ -7,7 +7,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 
-// Register a custom font (use a proper font URL if needed)
+// Register a custom font
 Font.register({
   family: "Helvetica",
   fonts: [
@@ -144,15 +144,18 @@ function InvoicePDF({ data, totalHarga, terbilangText }) {
 
         <Text style={styles.footer}>Terbilang: {terbilangText} Rupiah</Text>
 
+        {/* Rekening Dynamic */}
         <Text style={styles.footer}>
-          Rekening: Mandiri a/n Rini Setiana (1320016694177)
+          Rekening: {data.rekening.bank.toUpperCase()} a/n {data.rekening.nama_rekening.toUpperCase()} ({data.rekening.nomor_rekening})
         </Text>
 
         {/* Signature Section */}
+        // Di bagian signature InvoicePDF
         <View style={{ marginTop: 40, alignItems: "flex-end" }}>
           <Text>Hormat Saya,</Text>
-          <Text style={{ marginTop: 40 }}>RINI SETIANA</Text>
+          <Text style={{ marginTop: 40 }}>{data.penanda_tangan.toUpperCase()}</Text>
         </View>
+
       </Page>
     </Document>
   );

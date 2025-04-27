@@ -19,6 +19,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "22.14.1",
+    "@types/react": "19.1.2",
     "daisyui": "^5.0.28",
     "tailwindcss": "^4",
     "typescript": "5.8.3"
